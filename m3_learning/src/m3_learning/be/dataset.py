@@ -306,8 +306,8 @@ class BE_Dataset:
 
             # computes the SHO scaler
             self.SHO_Scaler()
-        except:
-            pass
+        except Exception as e:
+            print(e)
 
     def default_state(self):
         """
@@ -1026,7 +1026,12 @@ class BE_Dataset:
 
             # data groups in file
             SHO_fits = find_groups_with_string(
-                self.file, f'{dataset}-SHO_Fit_000')[0]
+                self.file, f'{dataset}-SHO_Fit_000')
+
+            # ignore missing keys for now
+            if not len(SHO_fits):
+                continue
+            SHO_fits = SHO_fits[0]
 
             with h5py.File(self.file, "r+") as h5_f:
 

@@ -79,16 +79,23 @@ def write_csv(write_CSV,
 
 
 class Multiscale1DFitter(nn.Module):
-    def __init__(self, function, x_data, input_channels, num_params, scaler=None, post_processing=None, device="cuda", loops_scaler=None, **kwargs):
+    def __init__(self, function, x_data, input_channels, num_params, scaler=None, post_processing=None, device=None, loops_scaler=None, **kwargs):
 
         self.input_channels = input_channels
         self.scaler = scaler
         self.function = function
         self.x_data = x_data
         self.post_processing = post_processing
-        self.device = device
         self.num_params = num_params
         self.loops_scaler = loops_scaler
+
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+                print(f"Using GPU {torch.cuda.get_device_name(0)}")
+            else:
+                self.device = "cpu"
+                print("Using CPU")
 
         super().__init__()
 
@@ -171,8 +178,8 @@ class Multiscale1DFitter(nn.Module):
             # corrects the scaling of the parameters
             unscaled_param = (
                 embedding *
-                torch.tensor(self.scaler.var_ ** 0.5).cuda()
-                + torch.tensor(self.scaler.mean_).cuda()
+                torch.tensor(self.scaler.var_ ** 0.5).to(self.device)
+                + torch.tensor(self.scaler.mean_).to(self.device)
             )
         else:
             unscaled_param = embedding
@@ -190,8 +197,8 @@ class Multiscale1DFitter(nn.Module):
             out = fits
 
         if self.loops_scaler is not None:
-            out_scaled = (out - torch.tensor(self.loops_scaler.mean).cuda()) / torch.tensor(
-                self.loops_scaler.std).cuda()
+            out_scaled = (out - torch.tensor(self.loops_scaler.mean).to(self.device)) / torch.tensor(
+                self.loops_scaler.std).to(self.device)
         else:
             out_scaled = out
 
@@ -199,26 +206,34 @@ class Multiscale1DFitter(nn.Module):
             return out_scaled, unscaled_param
         if self.training == False:
             # this is a scaling that includes the corrections for shifts in the data
-            embeddings = (unscaled_param.cuda() - torch.tensor(self.scaler.mean_).cuda()
-                          )/torch.tensor(self.scaler.var_ ** 0.5).cuda()
+            embeddings = (unscaled_param.to(self.device) - torch.tensor(self.scaler.mean_).to(self.device)
+                          )/torch.tensor(self.scaler.var_ ** 0.5).to(self.device)
             return out_scaled, embeddings, unscaled_param
 
 
 class ComplexPostProcessor:
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, device=None):
         self.dataset = dataset
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+                print(f"Using GPU {torch.cuda.get_device_name(0)}")
+            else:
+                self.device = "cpu"
+                print("Using CPU")
+
 
     def compute(self, fits):
         # extract and return real and imaginary
         real = torch.real(fits)
-        real_scaled = (real - torch.tensor(self.dataset.raw_data_scaler.real_scaler.mean).cuda()) / torch.tensor(
+        real_scaled = (real - torch.tensor(self.dataset.raw_data_scaler.real_scaler.mean).to(self.device)) / torch.tensor(
             self.dataset.raw_data_scaler.real_scaler.std
-        ).cuda()
+        ).to(self.device)
         imag = torch.imag(fits)
-        imag_scaled = (imag - torch.tensor(self.dataset.raw_data_scaler.imag_scaler.mean).cuda()) / torch.tensor(
+        imag_scaled = (imag - torch.tensor(self.dataset.raw_data_scaler.imag_scaler.mean).to(self.device)) / torch.tensor(
             self.dataset.raw_data_scaler.imag_scaler.std
-        ).cuda()
+        ).to(self.device)
         out = torch.stack((real_scaled, imag_scaled), 2)
 
         return out

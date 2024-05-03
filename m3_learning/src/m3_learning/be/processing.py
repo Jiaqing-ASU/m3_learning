@@ -18,6 +18,14 @@ from pyUSID.io.hdf_utils import  reshape_to_n_dims, get_auxiliary_datasets
 from sidpy.hdf.hdf_utils import get_attr
 
 
+if torch.cuda.is_available():
+    device = "cuda"
+    print(f"Using GPU {torch.cuda.get_device_name(0)}")
+else:
+    device = "cpu"
+    print("Using CPU")
+
+
 def transform_params(params_real, params_pred):
     """Utility function to transform the parameters to the correct distribution
 
@@ -362,8 +370,8 @@ def loop_fitting_function_torch(type, V, y):
         b2 = y[:, 7].type(torch.float64)
         b3 = y[:, 8].type(torch.float64)
         d = 1000
-        V1 = torch.tensor(V[:int(len(V) / 2)]).cuda()
-        V2 = torch.tensor(V[int(len(V) / 2):]).cuda()
+        V1 = torch.tensor(V[:int(len(V) / 2)]).to(device)
+        V2 = torch.tensor(V[int(len(V) / 2):]).to(device)
 
         g1 = (b1 - b0) / 2 * (torch.erf((V1 - a2) * d) + 1) + b0
         g2 = (b3 - b2) / 2 * (torch.erf((V2 - a3) * d) + 1) + b2
